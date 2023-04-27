@@ -1,0 +1,323 @@
+---
+author: "KOUASSI PAUL EMMANUEL"
+title: "CANCER ANALYSE"
+date: "`r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+## Global options
+knitr::opts_chunk$set(cache = TRUE, warning = FALSE, message = FALSE)
+library(reticulate)
+```
+
+We will conduct a study on the **cancer** database. Let's start by importing the necessary modules and the database
+
+```{r}
+library(tidyverse)
+library(recipes)
+library(workflows)
+
+data <- read.csv("Cancer_Data.csv")
+```
+
+# PART ONE: EXPLANATORY DATA ANALYSIS (EDA)
+
+```{r}
+glimpse(data)
+```
+
+Our dataset includes 32 columns, 1 of which presents the cancer ID. It will be removed before our analysis. Plus, we can observe the presence of an unknown column in the original database named `Unnamed: 32`. This one will also be removed. we'll change also target vairable type to **factor**
+
+```{r}
+data <- data %>% 
+  select(-c(X, id)) %>%
+  mutate(diagnosis = as.factor(diagnosis))
+```
+
+Now we can look at the characteristics of our database
+
+```{r paged.print=FALSE}
+data %>% skimr::skim()
+```
+
+```{python}
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+target = r.data["diagnosis"]
+graph = sns.countplot(x=target)
+graph.set_title("Cancer distribtion")
+graph.bar_label(graph.containers[0], label_type = 'edge')
+plt.show()
+```
+
+```{r}
+cor_data <- data %>%
+  select(-diagnosis) %>%
+  cor()
+  
+ggcorrplot::ggcorrplot(cor_data, hc.order = TRUE,
+                       type = "lower")
+```
+
+A lot of information is to be drawn from this analysis:
+
+-   **The database does not contain any missing data, nor duplicate data**
+
+-   **The target variable which is categorical is not unbalanced**. This saves us the resampling and its bias by extension
+
+-   **The presence of a strong correlation between some of the explanatory variables**. This would mean that some of them carry the same information.
+
+A model based on variables carrying the same information would bias our estimates. We'll therefore have to select the variables through **PCA**.
+
+```{r}
+library(FactoMineR)
+pca <- PCA(data, quali.sup = 1, graph = FALSE)
+```
+
+Let's determine the number of principal components to keep
+
+```{r}
+library(gt)
+library(factoextra)
+fviz_eig(pca, addlabels = TRUE)
+```
+
+```{r}
+library(knitr)
+kable(get_eigenvalue(pca))
+```
+
+The proportion of variance explained decreases slightly from the 4th component. **Therefore, We'll keep 4 main components**.
+
+```{r}
+pca <- FactoMineR::PCA(data, quali.sup = 1, graph = FALSE, ncp = 4)
+```
+
+The correlation circle. We will display the names of the variables best represented by the principal component
+
+```{r}
+plot.PCA(pca, choix = 'var', habillage = 'cos2', select = 'cos2  0.7',
+         unselect = 0, cex = 0.55, cex.main = 0.55, cex.axis = 0.55,
+         title = "Correlation circle of variable", axes = 1:2)
+```
+
+```{r}
+plot.PCA(pca, choix = 'var', habillage = 'cos2', select = 'cos2  0.7',
+         unselect = 0, cex = 0.55, cex.main = 0.55, cex.axis = 0.55,
+         title = "Correlation circle of variable",axes = 3:4)
+```
+
+The quality of the representation of the variables
+
+```{r}
+fviz_cos2(pca, choice = 'var', axes = 1:2)
+fviz_cos2(pca, choice = 'var', axes = 3:4)
+```
+
+and the contribution to the main axes
+
+```{r}
+fviz_contrib(pca, choice = "var", axes = 1:2, top = 30)
+fviz_contrib(pca, choice = "var", axes = 3:4, top = 30)
+```
+
+The variables that are best represented by the principal axes are:
+
+-   **area_mean**
+
+-   **radius_mean**
+
+-   **area_worst**
+
+-   **radius_worst**
+
+-   **perimeter_mean**
+
+-   **perimeter_worst**
+
+-   **concave.point_mean**
+
+-   **concave.point_worst**
+
+-   **concavity_mean**
+
+-   **concavity_worst**
+
+-   **compactness_mean**
+
+-   **compactness_worst**
+
+-   **fractal_dimension_mean**
+
+-   **texture_mean**
+
+-   **texture_worst**
+
+-   **texture_se**
+
+Plus, there is a strong positive correlation between :
+
+-   **area_mean** and **radius_mean,**
+
+-   **area_worst** and **radius_worst,**
+
+-   **perimeter_mean** and **and perimeter_worst**
+
+-   **concave.points_mean** and **concave.points_worst**
+
+-   **concavity_mean** and **concavity_worst**
+
+-   **compactness_mean** and **compactness_worst**
+
+-   **texture_mean** and **texture_worst**
+
+In this case, we will retain among these correlated variables, those which have a better contribution, namely:
+
+-   **area_mean**
+
+-   **perimeter_worst**
+
+-   **concave.points_mean**
+
+-   **concavity_mean**
+
+-   **compactness_mean**
+
+-   **fractal_dimension_mean**
+
+-   **texture_worst**
+
+-   **texture_se**
+
+# PART 2: MODELING
+
+Let's start by splitting our dataset into train and test
+
+```{r}
+library(rsample)
+set.seed(123)
+
+train_test_split <- initial_split(data)
+train_data <- training(train_test_split)
+test_data <- testing(train_test_split)
+```
+
+We create recipe to pre-processing
+
+```{r}
+library(recipes)
+data_rc <- recipe(diagnosis ~ ., data = train_data) %>%
+  step_normalize(all_predictors()) %>%
+  step_pca(all_predictors(), num_comp = 4) %>%
+  prep()
+```
+
+Then, we create the model
+
+```{r}
+library(parsnip)
+```
+
+## Logistic Regression
+
+```{r}
+# Create model
+lr <- logistic_reg() %>% set_engine('glm') %>% translate()
+lr
+```
+
+**Note:** Use \`translate()\` to show the model fit template.
+
+we don't need penalty because we've already done step_pca during pre-processing. So we actually use principals components to create the model
+
+```{r}
+# Create workflow
+library(workflows)
+lr_workflow <- workflow() %>%
+  add_recipe(data_rc) %>%
+  add_model(lr)
+```
+
+Note: **workflows** packages is used to **bundle** together the **pre-processing, modeling and post-processing requests**
+
+### Fit the model
+
+```{r}
+# fit the model
+lr_fit_train <- fit(lr_workflow, data = train_data)
+```
+
+```{r}
+# Estimate coefficient
+kable(lr_fit_train %>% extract_fit_parsnip() %>% tidy)
+```
+
+### Predict train
+
+```{r}
+# Show the first 10 rows
+lr_aug <- augment(lr_fit_train, train_data)
+kable(lr_aug %>% select(diagnosis, .pred_class, .pred_M) %>% slice(1:10))
+```
+
+#### Confusion matrix
+
+```{r}
+library(yardstick)
+lr_cm <- lr_aug %>% conf_mat(truth = diagnosis, estimate = .pred_class)
+lr_cm %>% autoplot(type = "heatmap")
+```
+
+```{r}
+# classification report
+lr_aug %>% metrics(truth = diagnosis, estimate = .pred_class)
+```
+
+#### Roc curve
+
+```{r}
+lr_aug %>% roc_curve(truth = diagnosis, .pred_B) %>% autoplot()
+```
+
+```{r}
+# AUC value
+kable(lr_aug %>% roc_auc(truth = diagnosis, .pred_B))
+```
+
+### Predict test
+
+```{r}
+# Show the first 10 rows
+lr_aug_test <- augment(lr_fit_train, test_data)
+kable(lr_aug_test %>% select(diagnosis, .pred_class, .pred_M) %>% slice(1:10))
+```
+
+#### Confusion matrix
+
+```{r}
+lr_cm <- lr_aug_test %>% conf_mat(truth = diagnosis, estimate = .pred_class)
+lr_cm %>% autoplot(type = "heatmap")
+```
+
+#### Roc curve
+
+```{r}
+lr_aug_test %>% roc_curve(truth = diagnosis, .pred_B) %>% autoplot()
+```
+
+```{r}
+kable(lr_aug_test %>% roc_auc(truth = diagnosis, .pred_B))
+```
+
+### Residual analysis
+
+Let's now check if the underlying assumptions of the model are respected
+
+```{r}
+# Residual analysis
+
+```
