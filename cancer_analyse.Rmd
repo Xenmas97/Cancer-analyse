@@ -23,7 +23,7 @@ library(workflows)
 data <- read.csv("Cancer_Data.csv")
 ```
 
-# PART ONE: EXPLANATORY DATA ANALYSIS (EDA)
+# PART 1: EXPLANATORY DATA ANALYSIS (EDA)
 
 ```{r}
 glimpse(data)
@@ -440,7 +440,7 @@ rf_aug %>% roc_curve(truth = diagnosis, .pred_B) %>% autoplot()
 
 ```{r}
 # AUC value
-kable(lr_aug %>% roc_auc(truth = diagnosis, .pred_B))
+kable(rf_aug %>% roc_auc(truth = diagnosis, .pred_B))
 ```
 
 ### Predict test
@@ -474,6 +474,6 @@ rf_aug_test %>% roc_curve(truth = diagnosis, .pred_B) %>% autoplot()
 kable(rf_aug_test %>% roc_auc(truth = diagnosis, .pred_B))
 ```
 
-The log linear regression model has better accuracy and AUC than the random forest model. This is probably due to the fact that we used the **original database** to build the random forest model while we used the **transformed dataset** for the logistic regression model. This does not prevent the random forest model from providing excellent results despite the presence of a strong correlation between some predictor variables.
+The log linear regression model has better accuracy and AUC than the random forest model. This is probably due to the fact that we used the **original database** to build the random forest model while we used the **transformed dataset** for the logistic regression model. This doesn't prevent the random forest model from providing excellent results despite the presence of a strong correlation between some predictor variables.
 
 This confirms that the **random forest model is robust**
