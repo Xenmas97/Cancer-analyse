@@ -474,6 +474,31 @@ rf_aug_test %>% roc_curve(truth = diagnosis, .pred_B) %>% autoplot()
 kable(rf_aug_test %>% roc_auc(truth = diagnosis, .pred_B))
 ```
 
-The log linear regression model has better accuracy and AUC than the random forest model. This is probably due to the fact that we used the **original database** to build the random forest model while we used the **transformed dataset** for the logistic regression model. This doesn't prevent the random forest model from providing excellent results despite the presence of a strong correlation between some predictor variables.
+The log linear regression model has better accuracy and AUC than the random forest model. This is probably due to the fact that we used the **original database** to build the random forest model while we used the **transformed dataset** for the logistic regression model. This doesn't prevent the random forest model from providing excellent results despite the presence of a strong correlation between some predictor variables. This confirms that the **random forest model is robust**
 
-This confirms that the **random forest model is robust**
+Given that we have used the initial database, we can visualize the importance of the variables
+
+```{r}
+library(vip)
+rf_feature <- rf_final %>% 
+  last_fit(train_test_split) %>%
+  extract_workflow() %>% 
+  extract_fit_parsnip() %>%
+  vip(num_features = 10)
+
+rf_feature
+```
+
+The most important variables in building the model are:
+
+-   **perimeter_worst**
+
+-   **concave.points_worst**
+
+-   **concave.points_mean**
+
+-   **radius_worst**
+
+-   **area_worst**
+
+One observation that can be made is that these variables are all among those that contribute the most to the first two principal components and also among those that are best represented by them. Better still, the most important variable, namely **perimeter_worst**, is also the one that is best represented in the first 2 principal components and also the one that contributes the most
