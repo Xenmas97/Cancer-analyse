@@ -501,4 +501,4 @@ The most important variables in building the model are:
 
 -   **area_worst**
 
-One observation that can be made is that these variables are all among those that contribute the most to the first two principal components and also among those that are best represented by them. Better still, the most important variable, namely **perimeter_worst**, is also the one that is best represented in the first 2 principal components and also the one that contributes the most
+One observation that can be made is that these variables are all among those that contribute the most to the first two principal components and also among those that are best represented by them.
